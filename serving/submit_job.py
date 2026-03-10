@@ -10,45 +10,6 @@ from jinja2 import Template
 from pydantic import BaseModel, model_validator
 
 
-class TemplateArgs(BaseModel):
-    job_name: str
-    account: str = "infra01"
-    nodes: int
-    partition: str = "normal"
-    time: str = "00:05:00"
-    environment: str
-    framework: str
-    framework_args: str = ""
-    pre_launch_cmds: str = ""
-    workers: int = 1
-    nodes_per_worker: Optional[int] = None
-    worker_port: int = 5000
-    use_router: bool = False
-    router_environment: Optional[str] = None
-    router_port: int = 30000
-    router_args: str = ""
-    disable_ocf: bool = False
-    ocf_service_name: str = "llm"
-    ocf_service_port: int = 8080
-
-    @model_validator(mode="after")
-    def set_defaults(self):
-        if self.nodes_per_worker is None:
-            self.nodes_per_worker = self.nodes // self.workers
-        if self.router_environment is None:
-            self.router_environment = self.environment
-        return self
-
-
-def generate_job_script(template_path, output_path, **kwargs):
-    with open(template_path, "r") as f:
-        template = Template(f.read())
-
-    rendered_script = template.render(**kwargs)
-    with open(output_path, "w") as f:
-        f.write(rendered_script)
-
-
 def submit_job(
     job_script_path, interactive, nodes, partition, time, account, environment
 ):
@@ -99,11 +60,50 @@ def submit_job(
             raise
 
 
+class TemplateArgs(BaseModel):
+    job_name: str
+    account: str = "infra01"
+    nodes: int
+    partition: str = "normal"
+    time: str = "00:05:00"
+    environment: str
+    framework: str
+    framework_args: str = ""
+    pre_launch_cmds: str = ""
+    workers: int = 1
+    nodes_per_worker: Optional[int] = None
+    worker_port: int = 5000
+    use_router: bool = False
+    router_environment: Optional[str] = None
+    router_port: int = 30000
+    router_args: str = ""
+    disable_ocf: bool = False
+    ocf_service_name: str = "llm"
+    ocf_service_port: int = 8080
+
+    @model_validator(mode="after")
+    def set_defaults(self):
+        if self.nodes_per_worker is None:
+            self.nodes_per_worker = self.nodes // self.workers
+        if self.router_environment is None:
+            self.router_environment = self.environment
+        return self
+
+
+def generate_job_script(template_path, output_path, template_args: TemplateArgs):
+    with open(template_path, "r") as f:
+        template = Template(f.read())
+
+    rendered_script = template.render(**template_args.model_dump())
+    with open(output_path, "w") as f:
+        f.write(rendered_script)
+
+
 def main():
     whoami = os.environ.get("USER", os.popen("whoami").read().strip())
     job_name = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
-    template_args = TemplateArgs(
+    sglang_args = TemplateArgs(
         job_name=job_name,
         nodes=1,
         framework="sglang",
@@ -116,10 +116,25 @@ def main():
         ),
     )
 
+    vllm_args = TemplateArgs(
+        job_name=job_name,
+        nodes=1,
+        framework="vllm",
+        environment=str(Path.cwd() / "serving/envs/vllm.toml"),
+        framework_args=(
+            "--model /capstor/store/cscs/swissai/infra01/hf_models/models/swiss-ai/Apertus-8B-Instruct-2509 "
+            f"--served-model-name swiss-ai/Apertus-8B-Instruct-2509-{whoami} "
+            "--host 0.0.0.0 "
+            "--port 8080 "
+        ),
+    )
+
+    template_args = sglang_args
+
     template_path = Path(__file__).parent / "template.jinja"
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as temp_file:
-        generate_job_script(template_path, temp_file.name, **template_args.model_dump())
+        generate_job_script(template_path, temp_file.name, template_args)
         submit_job(
             temp_file.name,
             interactive=False,

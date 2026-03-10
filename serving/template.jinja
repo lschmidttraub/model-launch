@@ -5,6 +5,7 @@
 #SBATCH --exclusive
 #SBATCH --nodes={{ nodes }}
 #SBATCH --partition={{ partition }}
+#SBATCH --reservation=PA-2338-RL
 #SBATCH --output=logs/%j/log.out
 #SBATCH --error=logs/%j/log.err
 
