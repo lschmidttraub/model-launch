@@ -4,45 +4,120 @@ import logging
 import argparse
 import tempfile
 
-from utils import nanoid, extract_model_name, setup_logging, generate_job_script, submit_job, fetch_bootstrap_addresses
+from utils import (
+    nanoid,
+    extract_model_name,
+    setup_logging,
+    generate_job_script,
+    submit_job,
+    fetch_bootstrap_addresses,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # SLURM-specific parameters (prefixed to avoid collisions)
     parser.add_argument("--slurm-job-name", type=str, default=None)
-    parser.add_argument("--slurm-nodes", type=int, required=True, help="Total number of nodes to allocate")
+    parser.add_argument(
+        "--slurm-nodes",
+        type=int,
+        required=True,
+        help="Total number of nodes to allocate",
+    )
     parser.add_argument("--slurm-partition", type=str, default="normal")
-    parser.add_argument("--slurm-time", type=str, default="04:00:00", help="Job time limit (default: 04:00:00)")
-    parser.add_argument("--slurm-account", type=str, default="infra01", help="SLURM account (default: infra01)")
-    parser.add_argument("--slurm-environment", type=str, help="SLURM environment name (default: {framework})")
-    parser.add_argument("--interactive", action="store_true", help="Launch interactive shell instead of batch job")
+    parser.add_argument(
+        "--slurm-time",
+        type=str,
+        default="04:00:00",
+        help="Job time limit (default: 04:00:00)",
+    )
+    parser.add_argument(
+        "--slurm-account",
+        type=str,
+        default="infra01",
+        help="SLURM account (default: infra01)",
+    )
+    parser.add_argument(
+        "--slurm-environment",
+        type=str,
+        help="SLURM environment name (default: {framework})",
+    )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Launch interactive shell instead of batch job",
+    )
 
     # Framework selection
-    parser.add_argument("--serving-framework", type=str, choices=["sglang", "vllm"], required=True, help="Serving framework to use")
+    parser.add_argument(
+        "--serving-framework",
+        type=str,
+        choices=["sglang", "vllm"],
+        required=True,
+        help="Serving framework to use",
+    )
 
     # Framework arguments as a single string
-    parser.add_argument("--framework-args", type=str, default="", help="Arguments to pass to the serving framework")
+    parser.add_argument(
+        "--framework-args",
+        type=str,
+        default="",
+        help="Arguments to pass to the serving framework",
+    )
 
     # Pre-launch setup
-    parser.add_argument("--pre-launch-cmds", type=str, default="", help="Commands to run before launching framework (e.g., 'pip install blobfile; pip install package2')")
+    parser.add_argument(
+        "--pre-launch-cmds",
+        type=str,
+        default="",
+        help="Commands to run before launching framework (e.g., 'pip install blobfile; pip install package2')",
+    )
 
     # Optional orchestration parameters
-    parser.add_argument("--workers", type=int, default=1, help="Number of independent workers")
-    parser.add_argument("--nodes-per-worker", type=int, help="Nodes per worker (default: all nodes / workers)")
-    parser.add_argument("--worker-port", type=int, default=5000, help="Port for workers")
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Number of independent workers"
+    )
+    parser.add_argument(
+        "--nodes-per-worker",
+        type=int,
+        help="Nodes per worker (default: all nodes / workers)",
+    )
+    parser.add_argument(
+        "--worker-port", type=int, default=5000, help="Port for workers"
+    )
 
     # Router parameters
-    parser.add_argument("--use-router", action="store_true", help="Enable router (only if workers > 1)")
-    parser.add_argument("--router-environment", type=str, help="SLURM environment for router (default: same as worker)")
+    parser.add_argument(
+        "--use-router", action="store_true", help="Enable router (only if workers > 1)"
+    )
+    parser.add_argument(
+        "--router-environment",
+        type=str,
+        help="SLURM environment for router (default: same as worker)",
+    )
     parser.add_argument("--router-port", type=int, default=30000, help="Router port")
-    parser.add_argument("--router-args", type=str, default="", help="Arguments to pass to the router")
+    parser.add_argument(
+        "--router-args", type=str, default="", help="Arguments to pass to the router"
+    )
 
     # OCF (Open Compute Framework) parameters
-    parser.add_argument("--disable-ocf", action="store_true", help="Disable OCF wrapper (OCF is enabled by default)")
-    parser.add_argument("--ocf-bootstrap-addr", type=str, default=None, help="OCF bootstrap address (fetched from API if not specified)")
-    parser.add_argument("--ocf-service-name", type=str, default="llm", help="OCF service name")
-    parser.add_argument("--ocf-service-port", type=int, default=8080, help="OCF service port")
+    parser.add_argument(
+        "--disable-ocf",
+        action="store_true",
+        help="Disable OCF wrapper (OCF is enabled by default)",
+    )
+    parser.add_argument(
+        "--ocf-bootstrap-addr",
+        type=str,
+        default=None,
+        help="OCF bootstrap address (fetched from API if not specified)",
+    )
+    parser.add_argument(
+        "--ocf-service-name", type=str, default="llm", help="OCF service name"
+    )
+    parser.add_argument(
+        "--ocf-service-port", type=int, default=8080, help="OCF service port"
+    )
 
     return parser.parse_args()
 
@@ -67,11 +142,19 @@ def main():
     template_path = os.path.join(script_dir, "template.jinja")
 
     # Determine environment name - default to framework name
-    environment = args.slurm_environment if args.slurm_environment else args.serving_framework
-    router_environment = args.router_environment if args.router_environment else environment
+    environment = (
+        args.slurm_environment if args.slurm_environment else args.serving_framework
+    )
+    router_environment = (
+        args.router_environment if args.router_environment else environment
+    )
 
     # Calculate nodes_per_worker if not specified
-    nodes_per_worker = args.nodes_per_worker if args.nodes_per_worker else args.slurm_nodes // args.workers
+    nodes_per_worker = (
+        args.nodes_per_worker
+        if args.nodes_per_worker
+        else args.slurm_nodes // args.workers
+    )
 
     # Fetch bootstrap address if not specified and OCF is enabled
     ocf_bootstrap_addr = args.ocf_bootstrap_addr
@@ -80,7 +163,9 @@ def main():
         if ocf_bootstrap_addr is None:
             # Fall back to hardcoded address if API fetch fails
             ocf_bootstrap_addr = "/ip4/148.187.108.172/tcp/43905/p2p/QmQsNxJVa2rnidp998qAz4FCutgmjBsuZqtrxUUy5YfgBu"
-            logging.warning(f"Falling back to hardcoded bootstrap address: {ocf_bootstrap_addr}")
+            logging.warning(
+                f"Falling back to hardcoded bootstrap address: {ocf_bootstrap_addr}"
+            )
 
     # Build template args
     template_args = {
@@ -115,7 +200,7 @@ def main():
             partition=args.slurm_partition,
             time=args.slurm_time,
             account=args.slurm_account,
-            environment=environment
+            environment=environment,
         )
 
         # Only show batch-specific info if not in interactive mode
