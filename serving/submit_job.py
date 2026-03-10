@@ -185,7 +185,7 @@ def main():
         "router_environment": router_environment,
         "router_port": args.router_port,
         "router_args": args.router_args,
-        "use_ocf": not args.disable_ocf,
+        "disable_ocf": args.disable_ocf,
         "ocf_bootstrap_addr": ocf_bootstrap_addr,
         "ocf_service_name": args.ocf_service_name,
         "ocf_service_port": args.ocf_service_port,
