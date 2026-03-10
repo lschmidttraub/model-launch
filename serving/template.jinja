@@ -21,12 +21,15 @@ ROUTER_ENVIRONMENT="{{ router_environment }}"
 ROUTER_PORT={{ router_port }}
 ROUTER_ARGS="{{ router_args }}"
 USE_OCF={{ "false" if disable_ocf else "true" }}
-OCF_BOOTSTRAP_ADDR="{{ ocf_bootstrap_addr }}"
 OCF_SERVICE_NAME="{{ ocf_service_name }}"
 OCF_SERVICE_PORT={{ ocf_service_port }}
 
 {% raw %}
 mkdir -p "${LOG_DIR}"
+
+OCF_BOOTSTRAP_ADDR=$(curl -sf http://148.187.108.172:8092/v1/dnt/bootstraps \
+    | jq -r '.bootstraps[0]' \
+    || echo "/ip4/148.187.108.172/tcp/43905/p2p/QmQsNxJVa2rnidp998qAz4FCutgmjBsuZqtrxUUy5YfgBu")
 
 # Architecture detection
 ARCH=$(uname -m)
