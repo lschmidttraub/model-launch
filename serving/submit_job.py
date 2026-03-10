@@ -4,6 +4,31 @@ import logging
 import argparse
 import tempfile
 
+from pydantic import BaseModel
+
+
+class TemplateArgs(BaseModel):
+    job_name: str
+    account: str
+    nodes: int
+    partition: str
+    time: str
+    environment: str
+    framework: str
+    framework_args: str
+    pre_launch_cmds: str
+    workers: int
+    nodes_per_worker: int
+    worker_port: int
+    use_router: bool
+    router_environment: str
+    router_port: int
+    router_args: str
+    disable_ocf: bool
+    ocf_bootstrap_addr: str
+    ocf_service_name: str
+    ocf_service_port: int
+
 from utils import (
     nanoid,
     extract_model_name,
@@ -167,32 +192,31 @@ def main():
                 f"Falling back to hardcoded bootstrap address: {ocf_bootstrap_addr}"
             )
 
-    # Build template args
-    template_args = {
-        "job_name": args.slurm_job_name,
-        "account": args.slurm_account,
-        "nodes": args.slurm_nodes,
-        "partition": args.slurm_partition,
-        "time": args.slurm_time,
-        "environment": environment,
-        "framework": args.serving_framework,
-        "framework_args": args.framework_args,
-        "pre_launch_cmds": args.pre_launch_cmds,
-        "workers": args.workers,
-        "nodes_per_worker": nodes_per_worker,
-        "worker_port": args.worker_port,
-        "use_router": args.use_router,
-        "router_environment": router_environment,
-        "router_port": args.router_port,
-        "router_args": args.router_args,
-        "disable_ocf": args.disable_ocf,
-        "ocf_bootstrap_addr": ocf_bootstrap_addr,
-        "ocf_service_name": args.ocf_service_name,
-        "ocf_service_port": args.ocf_service_port,
-    }
+    template_args = TemplateArgs(
+        job_name=args.slurm_job_name,
+        account=args.slurm_account,
+        nodes=args.slurm_nodes,
+        partition=args.slurm_partition,
+        time=args.slurm_time,
+        environment=environment,
+        framework=args.serving_framework,
+        framework_args=args.framework_args,
+        pre_launch_cmds=args.pre_launch_cmds,
+        workers=args.workers,
+        nodes_per_worker=nodes_per_worker,
+        worker_port=args.worker_port,
+        use_router=args.use_router,
+        router_environment=router_environment,
+        router_port=args.router_port,
+        router_args=args.router_args,
+        disable_ocf=args.disable_ocf,
+        ocf_bootstrap_addr=ocf_bootstrap_addr,
+        ocf_service_name=args.ocf_service_name,
+        ocf_service_port=args.ocf_service_port,
+    )
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as temp_file:
-        generate_job_script(template_path, temp_file.name, **template_args)
+        generate_job_script(template_path, temp_file.name, **template_args.model_dump())
         job_id = submit_job(
             temp_file.name,
             interactive=args.interactive,
