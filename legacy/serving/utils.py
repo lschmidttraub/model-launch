@@ -181,3 +181,14 @@ def submit_job(job_script_path, interactive=False, nodes=1, partition="normal", 
         except (IndexError, ValueError):
             logging.error(f"Error parsing job ID from sbatch output: {result.stdout}")
             raise
+
+def run_job(job_script_path):
+    try:
+        cmd = ["bash", job_script_path]
+        logging.info(f"Running serving orchestration inside existing allocation: {' '.join(cmd)}")
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return None
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error running job step: {e}")
+        logging.error(f"stderr: {e.stderr}")
+        raise
